@@ -2,37 +2,57 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:mcgapp/screens/teacher_details_screen.dart';
+import 'package:mcgapp/main.dart';
+import 'package:mcgapp/screens/teachers/teacher_details_screen.dart';
 import 'package:mcgapp/widgets/drawer.dart';
 
-import '../classes/teacher.dart';
+import '../../classes/teacher.dart';
+import '../../widgets/app_bar.dart';
 
-class TeacherListScreen extends StatefulWidget {
-  const TeacherListScreen({Key? key}) : super(key: key);
+class TeachersScreen extends StatefulWidget {
+  const TeachersScreen({Key? key}) : super(key: key);
 
   static const String routeName = '/teachers';
 
   @override
-  State<TeacherListScreen> createState() => _TeacherListScreenState();
+  State<TeachersScreen> createState() => _TeachersScreenState();
 }
 
-class _TeacherListScreenState extends State<TeacherListScreen> {
+class _TeachersScreenState extends State<TeachersScreen> {
   final List<Teacher> _teachers = [];
   final List<Teacher> _entries = [];
   final List<String> sekretariat = [];
+  final Map<String, CircleAvatar> _teacherImages = {};
 
-  Future<void> loadJsonData() async {
+  Future<void> _loadTeachers() async {
     var jsonText = await rootBundle.loadString('assets/data/teachers.json');
+    Map<String, Teacher> teachers = await Teacher.getTeachers();
     setState(() {
-      List data = json.decode(jsonText)['teachers'];
-      for (int i = 0; i < data.length; i++) {
-        _teachers.add(Teacher.fromJson(data, i));
-      }
+      _teachers.addAll(teachers.values);
       _entries.addAll(_teachers);
 
       sekretariat.add(json.decode(jsonText)['sekretariat']['email'] as String);
       sekretariat.add(json.decode(jsonText)['sekretariat']['phone'] as String);
     });
+
+    for (Teacher teacher in _teachers) {
+      String path = 'assets/images/teachers/${teacher.short}.jpg';
+      CircleAvatar teacherImage = await rootBundle.load(path).then((value) {
+        return CircleAvatar(
+          backgroundImage: AssetImage(path),
+          radius: 24,
+        );
+      }).catchError((_) {
+        return CircleAvatar(
+          backgroundColor: themeManager.colorSecondary,
+          radius: 24,
+          child: Icon(Icons.person_rounded, color: themeManager.colorStroke, size: 32),
+        );
+      });
+      setState(() {
+        _teacherImages[teacher.short] = teacherImage;
+      });
+    }
   }
 
   final TextEditingController _searchQueryController = TextEditingController();
@@ -93,10 +113,10 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
 
       _entries.clear();
       for (Teacher teacher in _teachers) {
-        if (teacher.nachname.toLowerCase().startsWith(searchQuery.toLowerCase()) ||
-            '${teacher.anrede} ${teacher.nachname}'.toLowerCase().startsWith(searchQuery.toLowerCase()) ||
-            teacher.vorname.toLowerCase().startsWith(searchQuery.toLowerCase()) ||
-            teacher.kuerzel.toLowerCase().startsWith(searchQuery.toLowerCase())) {
+        if (teacher.lastname.toLowerCase().startsWith(searchQuery.toLowerCase()) ||
+            '${teacher.title} ${teacher.lastname}'.toLowerCase().startsWith(searchQuery.toLowerCase()) ||
+            teacher.firstname.toLowerCase().startsWith(searchQuery.toLowerCase()) ||
+            teacher.short.toLowerCase().startsWith(searchQuery.toLowerCase())) {
           _entries.add(teacher);
         }
       }
@@ -121,18 +141,18 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
   @override
   void initState() {
     super.initState();
-    loadJsonData();
+    _loadTeachers();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: MCGAppBar(
         leading: _isSearching ? const BackButton() : null,
-        title: _isSearching ? _buildSearchField() : const Text('Lehrerliste'),
+        title: _isSearching ? _buildSearchField() : const Text('Lehrer'),
         actions: _buildActions(),
       ),
-      drawer: const MCGDrawer(routeName: TeacherListScreen.routeName),
+      drawer: const MCGDrawer(routeName: TeachersScreen.routeName),
       body: _entries.isNotEmpty
           ? ListView.builder(
               padding: const EdgeInsets.all(8),
@@ -141,6 +161,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 if (index == 0 && (!_isSearching || searchQuery == '')) {
                   return ListTile(
                     title: const Text('Sekretariat'),
+                    leading: const CircleAvatar(backgroundImage: AssetImage('assets/images/mcg-icon.jpg'), radius: 24),
                     onTap: () {
                       Navigator.pushNamed(
                         context,
@@ -154,9 +175,11 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                   return const Divider();
                 }
                 int teacherIndex = index ~/ 2 - ((_entries.isNotEmpty && !_isSearching || searchQuery == '') ? 1 : 0);
+                Teacher teacher = _entries[teacherIndex];
+
                 return ListTile(
-                  //leading: CircleAvatar(),
-                  title: Text('${_entries[teacherIndex].anrede} ${_entries[teacherIndex].nachname}'),
+                  title: Text('${teacher.title} ${teacher.lastname}'),
+                  leading: _teacherImages[teacher.short],
                   onTap: () {
                     Navigator.pushNamed(
                       context,
@@ -170,4 +193,3 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
     );
   }
 }
-

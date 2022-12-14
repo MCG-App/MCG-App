@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
+import 'package:mcgapp/classes/course.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../classes/substitution_entry.dart';
+import '../widgets/app_bar.dart';
 import '../widgets/drawer.dart';
 
 class SubstitutionsScreen extends StatefulWidget {
@@ -23,7 +25,7 @@ class SubstitutionsScreen extends StatefulWidget {
 class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
   final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
-  final int _maxTabBarLength = 3;
+  final int _maxTabBarLength = 5;
   List<Map> _substitutionData = [];
   List<String> _planNames = [];
 
@@ -49,7 +51,7 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
     });
 
     var dio = Dio();
-    for (int offset = 0; offset < 3; offset++) {
+    for (int offset = 0; offset < _maxTabBarLength; offset++) {
       DateTime now = DateTime.now();
       DateFormat format = DateFormat('yyyyMMdd');
       Map data;
@@ -107,7 +109,7 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
       setState(() {
         if (_substitutionData.length < _maxTabBarLength) {
           _substitutionData.add(data);
-          _planNames.add(_getDateFormat(planDate.toString()));
+          _planNames.add(_getDateFormat(planDate.toString(), false));
         }
       });
       _loadFilters();
@@ -133,16 +135,27 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
     });
   }
 
-  String _getDateFormat(String date) {
+  Future<void> _resetFilters() async {
+    setState(() {
+      _groupFilter = [];
+      _courseFilter = [];
+      _teacherFilter = [];
+    });
+    await _saveFilters();
+  }
+
+  String _getDateFormat(String date, bool onlyDates) {
     String now = DateFormat('yyyyMMdd').format(DateTime.now());
     int nowInt = int.parse(now);
     if (date != DateFormat('yyyyMMdd').format(DateTime.parse(date))) return 'Ungültiges Datum';
     int dateInt = int.parse(date);
 
-    if (date == now) return 'Heute';
-    if (dateInt == nowInt + 1) return 'Morgen';
-    if (dateInt == nowInt - 1) return 'Gestern';
-    if (dateInt > nowInt && dateInt < nowInt + 7) return DateFormat('EEEE', 'de').format(DateTime.parse(date));
+    if (!onlyDates) {
+      if (date == now) return 'Heute';
+      if (dateInt == nowInt + 1) return 'Morgen';
+      if (dateInt == nowInt - 1) return 'Gestern';
+      if (dateInt > nowInt && dateInt < nowInt + 7) return DateFormat('EEEE', 'de').format(DateTime.parse(date));
+    }
     return DateFormat('dd.MM.yyyy').format(DateTime.parse(date));
   }
 
@@ -154,10 +167,28 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
     if (tabs.isEmpty) tabs.add(const Tab(child: Text('Wird geladen...')));
 
     setState(() {
-      _tabBar = TabBar(tabs: tabs);
+      _tabBar = TabBar(tabs: tabs, isScrollable: true);
       _tabBarLength = tabs.length;
     });
     _updateTabViews();
+  }
+
+  bool _isInFilter(SubstitutionEntry entry) {
+    if ((_groupFilter.isEmpty ||
+            _groupFilter.map((e) => entry.group.toLowerCase().contains(e.toLowerCase())).contains(true)) &&
+        (_courseFilter.isEmpty ||
+            _courseFilter.map((e) => (entry.courseNew ?? '').toLowerCase().contains(e.toLowerCase())).contains(true) ||
+            _courseFilter.map((e) => (entry.courseOld ?? '').toLowerCase().contains(e.toLowerCase())).contains(true)) &&
+        (_teacherFilter.isEmpty ||
+            _teacherFilter
+                .map((e) => (entry.teacherNew ?? '').toLowerCase().contains(e.toLowerCase()))
+                .contains(true) ||
+            _teacherFilter
+                .map((e) => (entry.teacherOld ?? '').toLowerCase().contains(e.toLowerCase()))
+                .contains(true))) {
+      return true;
+    }
+    return false;
   }
 
   void _updateTabViews() {
@@ -171,24 +202,37 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
       }
 
       for (SubstitutionEntry entry in unfilteredEntries) {
-        if ((_groupFilter.isEmpty || _groupFilter.map((e) => e.toLowerCase()).contains(entry.group.toLowerCase())) &&
-            (_courseFilter.isEmpty ||
-                _courseFilter.map((e) => e.toLowerCase()).contains((entry.courseNew ?? '').toLowerCase()) ||
-                _courseFilter.map((e) => e.toLowerCase()).contains((entry.courseOld ?? '').toLowerCase())) &&
-            (_teacherFilter.isEmpty ||
-                _teacherFilter.map((e) => e.toLowerCase()).contains((entry.teacherNew ?? '').toLowerCase()) ||
-                _teacherFilter.map((e) => e.toLowerCase()).contains((entry.teacherOld ?? '').toLowerCase()))) {
+        if (_isInFilter(entry)) {
           filteredEntries.add(entry);
         }
       }
+
+      String lastUpdate = _substitutionData[i]['lastUpdate'];
+      String date = _getDateFormat(_substitutionData[i]['date'].toString(), true);
 
       tabViews.add(
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 10.0, top: 5.0, bottom: 5.0),
-              child: Text('Stand: ${_substitutionData[i]['lastUpdate']}'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Stand: ${lastUpdate.substring(0, lastUpdate.length - 3)}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      'Datum: $date',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
             unfilteredEntries.isEmpty
                 ? const Expanded(child: Center(child: Text('Keine Vertretungen')))
@@ -231,7 +275,7 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
             children: <Widget>[
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text('Es werden nur Ergebnisse angezeigt, die auf alle Filter zutreffen.\n'
+                child: Text('Es werden nur Ergebnisse angezeigt, die auf alle drei Filter zutreffen.\n'
                     '\nMehrere Einträge sind durch Leerzeichen zu trennen.'),
               ),
               Padding(
@@ -280,15 +324,64 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ElevatedButton(
                   onPressed: () {
+                    if (group!.level > 10) {
+                      setState(() {
+                        _groupFilter = [];
+                        _courseFilter = userCourses.map((e) => e.title).toList();
+                        _teacherFilter = [];
+                      });
+                    } else {
+                      setState(() {
+                        _groupFilter = [group!.name];
+                        _courseFilter = [];
+                        _teacherFilter = [];
+                      });
+                    }
                     _saveFilters();
-                    _updateTabViews();
-                    Navigator.of(context).pop();
+                    groupFilterController.text = _groupFilter.join(' ');
+                    courseFilterController.text = _courseFilter.join(' ');
+                    teacherFilterController.text = _teacherFilter.join(' ');
                   },
-                  child: const Text('Speichern'),
+                  child: Text('Auf ${group!.level > 10 ? 'Kurse' : 'Klasse'} anpassen'),
                 ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _resetFilters();
+                          _updateTabViews();
+                          setState(() {
+                            groupFilterController.text = _groupFilter.join(' ');
+                            courseFilterController.text = _courseFilter.join(' ');
+                            teacherFilterController.text = _teacherFilter.join(' ');
+                          });
+                        },
+                        child: const Text('Leeren'),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _saveFilters();
+                          _updateTabViews();
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Speichern'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           );
@@ -301,7 +394,7 @@ class _SubstitutionsScreenState extends State<SubstitutionsScreen> {
       initialIndex: 0,
       length: _tabBarLength,
       child: Scaffold(
-        appBar: AppBar(
+        appBar: MCGAppBar(
           title: const Text('Vertretungsplan'),
           actions: [
             IconButton(icon: const Icon(Icons.refresh), onPressed: () => _getSubstitutions()),

@@ -1,12 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mcgapp/classes/room.dart';
 import 'package:mcgapp/main.dart';
+import 'package:mcgapp/widgets/bottom_sheet.dart';
 
+import '../widgets/app_bar.dart';
 import '../widgets/drawer.dart';
 
 class RoomplanScreen extends StatefulWidget {
@@ -31,29 +30,24 @@ class _RoomplanScreenState extends State<RoomplanScreen> {
   late double _planWidth;
   late double _planHeight;
 
-  Future<void> loadJsonData() async {
-    var jsonText = await rootBundle.loadString('assets/data/rooms.json');
+  Future<void> _loadRooms() async {
+    Map<String, Room> rooms = await Room.getRooms();
 
     setState(() {
-      List data = json.decode(jsonText)['rooms'];
-      for (int i = 0; i < data.length; i++) {
-        Room room = Room.fromJson(data, i);
-
-        if (room.number.startsWith('0')) {
+      for (Room room in rooms.values) {
+        if (room.number.startsWith('0') || room.number == 'TH') {
           _rooms[0].add(room);
         } else if (room.number.startsWith('1')) {
           _rooms[1].add(room);
         }
       }
     });
-
-    _setSelectedPlan(0);
   }
 
   @override
   void initState() {
     super.initState();
-    loadJsonData();
+    _loadRooms().then((_) => _setSelectedPlan(0));
   }
 
   Widget _loadPlan(int floor) => Stack(
@@ -66,7 +60,7 @@ class _RoomplanScreenState extends State<RoomplanScreen> {
             top: _offsetY,
             child: SvgPicture.asset(
               fit: BoxFit.fill,
-              'assets/images/roomplan$floor-${themeManager.themeMode == ThemeMode.dark ? 'dark' : 'light'}.svg',
+              'assets/images/room_plan/room_plan_${floor}_${themeManager.themeMode == ThemeMode.dark ? 'dark' : 'light'}.svg',
               width: 300,
               height: 125,
             ),
@@ -88,64 +82,31 @@ class _RoomplanScreenState extends State<RoomplanScreen> {
   }
 
   void _showBottomSheet(context, Room room) {
-    showModalBottomSheet<dynamic>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(18), topRight: Radius.circular(18)),
-      ),
-      builder: (BuildContext context) {
-        return Wrap(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 10, top: 10),
-                child: IconButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.close),
-                  color: Colors.black,
-                  alignment: Alignment.topRight,
-                ),
-              ),
-            ),
-            const Divider(),
-            Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 10, top: 5),
-                child: Text(
-                  room.name,
-                  style: const TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_tree),
-              title: Text(room.type),
-            ),
-            ListTile(
-              leading: const Icon(Icons.numbers),
-              title: Text(room.number),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: Text(room.teacher),
-            )
-          ],
-        );
-      },
+    showMCGBottomSheet(
+      context,
+      room.name,
+      [
+        ListTile(
+          leading: const Icon(Icons.account_tree),
+          title: Text(room.type),
+        ),
+        ListTile(
+          leading: const Icon(Icons.numbers),
+          title: Text(room.number),
+        ),
+        ListTile(
+          leading: const Icon(Icons.person),
+          title: Text(room.teacher),
+        ),
+      ],
+      [],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: MCGAppBar(
         title: Text(_appBarTitle),
         actions: [
           IconButton(
@@ -254,7 +215,7 @@ class _RoomplanScreenState extends State<RoomplanScreen> {
             },
             child: InteractiveViewer(
               transformationController: transformationController,
-              maxScale: 5,
+              maxScale: _screenHeight / _screenWidth * 3,
               scaleFactor: 2,
               child: Container(
                 constraints: const BoxConstraints.expand(),

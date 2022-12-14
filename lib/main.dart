@@ -13,11 +13,15 @@ import 'package:mcgapp/screens/home_screen.dart';
 import 'package:mcgapp/screens/roomplan_screen.dart';
 import 'package:mcgapp/screens/settings_screen.dart';
 import 'package:mcgapp/screens/substitutions_screen.dart';
-import 'package:mcgapp/screens/teacher_details_screen.dart';
-import 'package:mcgapp/screens/teacher_list_screen.dart';
+import 'package:mcgapp/screens/teachers/teacher_details_screen.dart';
+import 'package:mcgapp/screens/teachers/teachers_screen.dart';
+import 'package:mcgapp/screens/timeline_screen.dart';
 import 'package:mcgapp/screens/timetable_screen.dart';
 import 'package:mcgapp/theme/theme_constants.dart';
 import 'package:mcgapp/theme/theme_manager.dart';
+
+import 'classes/room.dart';
+import 'classes/teacher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +31,9 @@ void main() async {
   AppUser.loadUser();
   runApp(const MyApp());
 }
+
+String get appName => 'MCG-App';
+String get appVersion => '0.3.0-beta.4';
 
 ThemeManager themeManager = ThemeManager();
 
@@ -38,10 +45,16 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  Future<void> _loadValuesFromJson() async {
+    teachers = await Teacher.getTeachers();
+    rooms = await Room.getRooms();
+  }
+
   String _initialRoute = SignInScreen.routeName;
 
   @override
   void initState() {
+    _loadValuesFromJson();
     themeManager.loadTheme();
     themeManager.addListener(themeListener);
 
@@ -67,7 +80,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MCG App',
+      title: appName,
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,
@@ -77,10 +90,11 @@ class _MyAppState extends State<MyApp> {
         SignInScreen.routeName: (context) => const SignInScreen(),
         SignUpScreen.routeName: (context) => const SignUpScreen(),
         HomeScreen.routeName: (context) => const HomeScreen(),
+        TimelineScreen.routeName: (context) => const TimelineScreen(),
         TimetableScreen.routeName: (context) => const TimetableScreen(),
         SubstitutionsScreen.routeName: (context) => const SubstitutionsScreen(),
         RoomplanScreen.routeName: (context) => const RoomplanScreen(),
-        TeacherListScreen.routeName: (context) => const TeacherListScreen(),
+        TeachersScreen.routeName: (context) => const TeachersScreen(),
         TeacherDetailsScreen.routeName: (context) => const TeacherDetailsScreen(),
         SekretariatScreen.routeName: (context) => const SekretariatScreen(),
         GradesScreen.routeName: (context) => const GradesScreen(),

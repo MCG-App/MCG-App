@@ -1,14 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:mcgapp/main.dart';
 import 'package:mcgapp/classes/user.dart';
 import 'package:mcgapp/screens/auth/signin_screen.dart';
 import 'package:mcgapp/screens/home_screen.dart';
 import 'package:mcgapp/screens/substitutions_screen.dart';
 
+import '../screens/credits_screen.dart';
 import '../screens/grades/grades_screen.dart';
 import '../screens/roomplan_screen.dart';
 import '../screens/settings_screen.dart';
-import '../screens/teacher_list_screen.dart';
+import '../screens/teachers/teachers_screen.dart';
+import '../screens/timeline_screen.dart';
+import '../screens/timetable_screen.dart';
 
 class MCGDrawer extends StatelessWidget {
   const MCGDrawer({
@@ -24,24 +28,36 @@ class MCGDrawer extends StatelessWidget {
       child: ListView(
         padding: EdgeInsets.zero,
         children: <Widget>[
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
+          SizedBox(
+            height: 150,
+            child: DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  Text(
-                    '${AppUser.user.firstName} ${AppUser.user.lastName}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
+                  const Padding(
+                    padding: EdgeInsets.only(right: 16),
+                    child: CircleAvatar(
+                      foregroundImage: AssetImage('assets/images/mcg-icon.jpg'),
+                      radius: 35,
                     ),
                   ),
-                  Text(AppUser.user.email, style: const TextStyle(color: Colors.white)),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${AppUser.user.firstName} ${AppUser.user.lastName}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                        ),
+                      ),
+                      Text(AppUser.user.email, style: const TextStyle(color: Colors.white)),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -64,28 +80,44 @@ class MCGDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(
-              Icons.book,
-              color: Colors.grey, //routeName == const TimetableScreen().routeName ? Colors.green : null,
+            leading: Icon(
+              Icons.timeline,
+              color: routeName == TimelineScreen.routeName ? Colors.green : null,
             ),
-            title: const Text(
-              'Stundenplan - Coming Soon',
-              style: TextStyle(
-                color: Colors.grey, /*routeName == const TimetableScreen().routeName ? Colors.green : null*/
-              ),
+            title: Text(
+              'Timeline',
+              style: TextStyle(color: routeName == TimelineScreen.routeName ? Colors.green : null),
             ),
             onTap: () {
-              /*if (routeName == TimetableScreen.routeName) {
+              if (routeName == TimelineScreen.routeName) {
                 Navigator.pop(context);
               } else {
                 Navigator.pushNamedAndRemoveUntil(context, HomeScreen.routeName, (route) => false);
-                Navigator.pushNamed(context, TimetableScreen.routeName);
-              }*/
+                Navigator.pushNamed(context, TimelineScreen.routeName);
+              }
             },
           ),
           ListTile(
             leading: Icon(
-              Icons.calendar_today,
+              Icons.calendar_month,
+              color: routeName == TimetableScreen.routeName ? Colors.green : null,
+            ),
+            title: Text(
+              'Stundenplan',
+              style: TextStyle(color: routeName == TimetableScreen.routeName ? Colors.green : null),
+            ),
+            onTap: () {
+              if (routeName == TimetableScreen.routeName) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushNamedAndRemoveUntil(context, HomeScreen.routeName, (route) => false);
+                Navigator.pushNamed(context, TimetableScreen.routeName);
+              }
+            },
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.edit_calendar,
               color: routeName == SubstitutionsScreen.routeName ? Colors.green : null,
             ),
             title: Text(
@@ -103,7 +135,7 @@ class MCGDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: Icon(
-              Icons.room_outlined,
+              Icons.room,
               color: routeName == RoomplanScreen.routeName ? Colors.green : null,
             ),
             title: Text(
@@ -122,18 +154,18 @@ class MCGDrawer extends StatelessWidget {
           ListTile(
             leading: Icon(
               Icons.person,
-              color: routeName == TeacherListScreen.routeName ? Colors.green : null,
+              color: routeName == TeachersScreen.routeName ? Colors.green : null,
             ),
             title: Text(
-              'Lehrerliste',
-              style: TextStyle(color: routeName == TeacherListScreen.routeName ? Colors.green : null),
+              'Lehrer',
+              style: TextStyle(color: routeName == TeachersScreen.routeName ? Colors.green : null),
             ),
             onTap: () {
-              if (routeName == TeacherListScreen.routeName) {
+              if (routeName == TeachersScreen.routeName) {
                 Navigator.pop(context);
               } else {
                 Navigator.pushNamedAndRemoveUntil(context, HomeScreen.routeName, (route) => false);
-                Navigator.pushNamed(context, TeacherListScreen.routeName);
+                Navigator.pushNamed(context, TeachersScreen.routeName);
               }
             },
           ),
@@ -174,7 +206,7 @@ class MCGDrawer extends StatelessWidget {
               }
             },
           ),
-          /*ListTile(
+          ListTile(
             leading: Icon(
               Icons.account_balance,
               color: routeName == CreditsScreen.routeName ? Colors.green : null,
@@ -192,7 +224,31 @@ class MCGDrawer extends StatelessWidget {
               }
             },
           ),
-          const Divider(indent: 10, endIndent: 10, thickness: 1),*/
+          AboutListTile(
+            icon: const Icon(Icons.info),
+            applicationName: appName,
+            applicationVersion: appVersion,
+            applicationLegalese: 'Sven Luca Hafemann',
+            applicationIcon: const CircleAvatar(foregroundImage: AssetImage('assets/images/mcg-icon.jpg'), radius: 35),
+            aboutBoxChildren: const [
+              Text(
+                '\nDiese App wurde nicht von der Schulleitung des Marie-Curie-Gymnasiums Dallgow-Döberitz in Auftrag '
+                'gegeben und wird nicht von ihr betreut. Die Schulleitung ist in keiner Weise für jegliche sich aus '
+                'der Veröffentlichung sowie der Verwendung ergebende Folgen verantwortlich.\n\n'
+                'Die Nutzung der App erfolgt auf eigene Gefahr und Verantwortung. Es besteht keinerlei Garantie auf '
+                'Richtigkeit, Vollständigkeit oder Verfügbarkeit der angezeigten Informationen in allen derzeitigen '
+                'und künftigen Elementen dieser App. Dies trifft unter Anderem auf den Stundenplan, den '
+                'Vertretungsplan, den Raumplan, die Lehrerliste und jegliche Funktionen der Notenübersicht zu.\n\n'
+                'Diese App ist unter der GNU General Public Licence v3.0 lizenziert.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+            child: Text('Über $appName'),
+          ),
+          const Divider(indent: 10, endIndent: 10, thickness: 1),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Abmelden'),
@@ -201,7 +257,7 @@ class MCGDrawer extends StatelessWidget {
 
               Navigator.pushNamedAndRemoveUntil(context, SignInScreen.routeName, (route) => false);
             },
-          )
+          ),
         ],
       ),
     );

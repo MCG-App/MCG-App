@@ -3,28 +3,32 @@ import 'package:intl/intl.dart';
 import 'package:mcgapp/widgets/bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../enums/grade_type.dart';
 import 'course.dart';
 
 enum GradeFormat { format15, format6 }
 
-enum GradeType { test, exam }
-
 class Grade {
-
   static List<Grade> _grades = [];
-  static final List<int> _gradeEntries = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-  
+  static final List<int> _gradeEntriesSekI = [1, 2, 3, 4, 5, 6];
+  static final List<int> _gradeEntriesSekII = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+
   static List<Grade> get grades => _grades;
-  static List<int> get gradeEntries => _gradeEntries;
+  static List<int> get gradeEntries {
+    if (group!.level > 10) return _gradeEntriesSekII;
+    return _gradeEntriesSekI;
+  }
 
   static double get totalAverage {
-    if (grades.isEmpty) return -1;
-    List<int> gradeList = grades.map((e) => e.grade).toList();
+    List<Course> coursesWithGrades = userCourses.where((e) => e.gradeAverage != -1).toList();
+    if (coursesWithGrades.isEmpty) return -1;
 
-    int sum = 0;
-    for (var element in gradeList) { sum += element; }
+    double sum = 0;
+    for (Course course in coursesWithGrades) {
+      sum += course.gradeAverage;
+    }
 
-    return sum / gradeList.length;
+    return sum / coursesWithGrades.length;
   }
 
   static void sortGrades() {
@@ -54,8 +58,8 @@ class Grade {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> encodedGrades = [];
     for (Grade grade in grades) {
-      encodedGrades
-          .add('${grade.title}|${grade.course.subject.title}|${grade.grade}|${DateFormat('yyyy-MM-dd').format(grade.date)}');
+      encodedGrades.add('${grade.title}|${grade.course.title}|${grade.grade}|'
+                        '${DateFormat('yyyy-MM-dd').format(grade.date)}|${grade.type}');
     }
     prefs.setStringList('grades', encodedGrades);
   }
@@ -68,11 +72,11 @@ class Grade {
       List<String> gradeParameters = encodedGrade.split('|');
       decodedGrades.add(Grade(
         title: gradeParameters[0],
-        course: Course.fromTitle(gradeParameters[1])!,
+        course: Course.fromTitle(gradeParameters[1]),
         format: GradeFormat.format15,
         grade: int.parse(gradeParameters[2]),
         date: DateTime.parse(gradeParameters[3]),
-        type: GradeType.test,
+        type: GradeType.fromName(gradeParameters[4]),
       ));
     }
     _grades = decodedGrades;
@@ -101,7 +105,7 @@ class Grade {
           Icons.school,
           color: course.subject.backgroundColor,
         ),
-        title: Text(course.subject.title),
+        title: Text('${course.subject.name} (${course.title})'),
       ),
       ListTile(
         leading: const Icon(Icons.star),
@@ -112,7 +116,7 @@ class Grade {
         title: Text(DateFormat('EEEE, d. MMMM yyyy', 'de').format(date)),
       ),
       ListTile(
-        leading: const Icon(Icons.text_fields),
+        leading: type.icon,
         title: Text(type.name),
       ),
     ];
@@ -133,7 +137,7 @@ class Grade {
             ),
           ),
           Text(
-            course.subject.title,
+            course.subject.name,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Colors.grey,

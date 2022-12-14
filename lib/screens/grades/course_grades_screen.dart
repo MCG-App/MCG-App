@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:mcgapp/enums/grade_type.dart';
 
 import '../../classes/course.dart';
 import '../../classes/grade.dart';
 import '../../main.dart';
+import '../../widgets/app_bar.dart';
+import '../../widgets/confirmation_dialog.dart';
 import 'grade_edit_screen.dart';
 
 class CourseGradesScreen extends StatefulWidget {
@@ -22,60 +25,74 @@ class _CourseGradesScreenState extends State<CourseGradesScreen> {
   _updateBody() async {
     await Grade.loadGrades();
     setState(() {
-      _body = ListView.builder(
-        itemCount: course.courseGrades.length * 2 + 1,
-        itemBuilder: (BuildContext context, int index) {
-          if (index == course.courseGrades.length * 2) return const SizedBox(height: 76);
-          if (index.isOdd) return const Divider();
+      List<int> typesWithGrades = course.gradeTypes.keys
+          .where((typeId) => course.courseGrades.where((grade) => grade.type.id == typeId).isNotEmpty)
+          .toList();
+      typesWithGrades.sort((a, b) => b.compareTo(a));
 
-          Grade grade = course.courseGrades[index ~/ 2];
-          return grade.listTile(context, <Widget>[
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                foregroundColor: themeManager.colorStroke,
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.edit),
-                  SizedBox(width: 8),
-                  Text('Bearbeiten'),
-                ],
-              ),
-              onPressed: () async {
-                Navigator.pop(context);
-                await Navigator.pushNamed(
-                  context,
-                  GradeEditScreen.routeName,
-                  arguments: {'grade': grade},
-                ).then((newGrade) { if (newGrade != null) Grade.editGrade(grade, newGrade as Grade); });
+      _body = course.courseGrades.isEmpty
+          ? const Center(child: Text('Keine Noten in diesem Fach'))
+          : ListView.builder(
+              itemCount: typesWithGrades.length * 2 + 1,
+              itemBuilder: (BuildContext context, int index) {
+                if (index == typesWithGrades.length * 2) return const SizedBox(height: 76);
+                int typeId = typesWithGrades[index ~/ 2];
+                List<Grade> typeGrades = course.courseGrades.where((e) => e.type.id == typeId).toList();
 
-                if (!mounted) return;
-                _updateBody();
+                if (index.isEven) {
+                  return Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      GradeType.getTypeName(typeId),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: themeManager.themeMode == ThemeMode.dark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                    children: typeGrades
+                        .map((e) => e.listTile(context, <Widget>[
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Colors.grey),
+                                onPressed: () async {
+                                  Navigator.pop(context);
+                                  await Navigator.pushNamed(
+                                    context,
+                                    GradeEditScreen.routeName,
+                                    arguments: {'grade': e},
+                                  ).then((newGrade) {
+                                    if (newGrade != null) Grade.editGrade(e, newGrade as Grade);
+                                  });
+
+                                  if (!mounted) return;
+                                  _updateBody();
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.grey),
+                                onPressed: () {
+                                  showConfirmationDialog(
+                                    context,
+                                    'Löschen',
+                                    '',
+                                    'ABBRECHEN',
+                                    'LÖSCHEN',
+                                    () {
+                                      Grade.removeGrade(e);
+                                      Navigator.pop(context);
+                                      Navigator.pop(context);
+                                      _updateBody();
+                                    },
+                                  );
+                                },
+                              ),
+                            ]))
+                        .toList());
               },
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                foregroundColor: themeManager.colorStroke,
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.delete),
-                  SizedBox(width: 8),
-                  Text('Löschen'),
-                ],
-              ),
-              onPressed: () {
-                Grade.removeGrade(grade);
-                Navigator.pop(context);
-                _updateBody();
-              },
-            ),
-          ]);
-        },
-      );
+            );
     });
   }
 
@@ -90,8 +107,8 @@ class _CourseGradesScreenState extends State<CourseGradesScreen> {
     course = ModalRoute.of(context)!.settings.arguments as Course;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(course.subject.title),
+      appBar: MCGAppBar(
+        title: Text(course.subject.name, style: TextStyle(color: course.subject.foregroundColor)),
         backgroundColor: course.subject.backgroundColor,
         foregroundColor: course.subject.foregroundColor,
         actions: [
@@ -114,7 +131,9 @@ class _CourseGradesScreenState extends State<CourseGradesScreen> {
             context,
             GradeEditScreen.routeName,
             arguments: {'course': course},
-          ).then((newGrade) { if (newGrade != null) Grade.addGrade(newGrade as Grade); });
+          ).then((newGrade) {
+            if (newGrade != null) Grade.addGrade(newGrade as Grade);
+          });
 
           if (!mounted) return;
           _updateBody();

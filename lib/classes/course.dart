@@ -1,48 +1,56 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:mcgapp/classes/grade.dart';
 import 'package:mcgapp/classes/room.dart';
+import 'package:mcgapp/enums/subject.dart';
 import 'package:mcgapp/classes/teacher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-enum Subject {
-  biology('Biologie', 'Bio', Color(0xFF2E7D32)),
-  chemistry('Chemie', 'Che', Colors.green),
-  german('Deutsch', 'Deu', Colors.red),
-  english('Englisch', 'Eng', Colors.yellow),
-  religionE('evangelische Religion', 'eRe', Color(0xFFBA68C8)),
-  history('Geschichte', 'Ges', Color(0xFF8D6E63)),
-  geography('Geographie', 'Geo', Colors.deepPurple),
-  informatics('Informatik', 'Inf', Colors.teal),
-  religionK('katholische Religion', 'kRe', Color(0xFF7B1FA2)),
-  art('Kunst', 'Kun', Colors.pinkAccent),
-  ler('LER', 'LER', Colors.purple),
-  maths('Mathematik', 'Mat', Color(0xFF0D47A1)),
-  music('Musik', 'Mus', Color(0xFF5D4037)),
-  physics('Physik', 'Phy', Colors.blue),
-  politics('Politische Bildung', 'PB', Colors.grey),
-  sk('Seminarkurs', 'SK', Colors.blueGrey),
-  spanish('Spanisch', 'Spa', Color(0xFFFF6D00)),
-  pe('Sport', 'Spo', Colors.brown),
-  wat('Wirtschaft-Arbeit-Technik', 'WAT', Color(0xFFE0E0E0));
+import '../enums/group.dart';
 
-  const Subject(this.title, this.short, this.backgroundColor);
-  final String title;
-  final String short;
-  final Color backgroundColor;
+Map<String, Course> courses = {};
+List<Course> userCourses = [];
+Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
-  Color get foregroundColor => backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+Group? group;
+
+setUserCourses(List<Course> courses) async {
+  userCourses = courses;
+
+  SharedPreferences prefs = await _prefs;
+  prefs.setStringList('courses-${group!.level}', userCourses.map((course) => course.title).toList());
 }
 
 class Course {
-  Subject subject;
-  Teacher teacher;
-  Room room;
+  late String title;
+  late Subject subject;
+  late Teacher teacher;
+  late List<List<String>> times;
+  late List only;
+  late bool required;
 
   Course({
+    required this.title,
     required this.subject,
     required this.teacher,
-    required this.room,
+    required this.times,
+    required this.only,
+    required this.required,
   });
+
+  List<Room> get rooms {
+    List<Room> rooms = [];
+    for (List<String> time in times) {
+      Room room = Room.fromNumber(time[1]);
+      if (!rooms.contains(room)) {
+        rooms.add(room);
+      }
+    }
+    return rooms;
+  }
 
   List<Grade> get courseGrades {
     List<Grade> courseGrades = [];
@@ -50,19 +58,56 @@ class Course {
     for (Grade grade in Grade.grades) {
       if (grade.course == this) courseGrades.add(grade);
     }
-    courseGrades.sort((a, b) => int.parse(DateFormat('yyyyMMdd').format(b.date))
-        .compareTo(int.parse(DateFormat('yyyyMMdd').format(a.date))));
+    courseGrades.sort((a, b) =>
+        int.parse(DateFormat('yyyyMMdd').format(b.date)).compareTo(int.parse(DateFormat('yyyyMMdd').format(a.date))));
     return courseGrades;
   }
 
   double get gradeAverage {
     if (courseGrades.isEmpty) return -1;
-    List<int> gradeList = courseGrades.map((e) => e.grade).toList();
+    Map<int, double> typeAverages = {};
 
-    int sum = 0;
-    for (var element in gradeList) { sum += element; }
+    for (int typeId in gradeTypes.keys) {
+      List<Grade> typeGrades = courseGrades.where((element) => element.type.id == typeId).toList();
+      if (typeGrades.isNotEmpty) {
+        int sum = 0;
+        for (var element in typeGrades) {
+          sum += element.grade;
+        }
+        double average = sum / typeGrades.length;
+        typeAverages[typeId] = average;
+      }
+    }
 
-    return sum / gradeList.length;
+    double average = 0;
+    for (int typeId in typeAverages.keys) {
+      average += typeAverages[typeId]! * (typeAverages.values.length > 1 ? gradeTypes[typeId]! : 1);
+    }
+    return average;
+  }
+
+  Map<int, double> get gradeTypes {
+    Map<int, double> gradeTypes = {};
+
+    if (group!.level > 10) {
+      gradeTypes[0] = 0.67;
+      gradeTypes[2] = 0.33;
+    } else {
+      switch (subject) {
+        case Subject.deu:
+        case Subject.mat:
+        case Subject.eng:
+        case Subject.spa:
+          gradeTypes[0] = 0.5;
+          gradeTypes[1] = 0.5;
+          break;
+        default:
+          gradeTypes[0] = 1;
+          break;
+      }
+    }
+
+    return gradeTypes;
   }
 
   Widget get circleAvatar {
@@ -78,37 +123,51 @@ class Course {
     );
   }
 
-  static Course? fromTitle(String title) {
-    for (Course course in courses) {
-      if (course.subject.title == title) return course;
+  @override
+  bool operator ==(covariant Course other) => other.title == title;
+
+  @override
+  int get hashCode => title.hashCode;
+
+  static Future<Map<String, Course>> getCourses(Group group) async {
+    var jsonText = await rootBundle.loadString('assets/data/courses/courses-${group.level}.json');
+
+    List data = json.decode(jsonText)['courses'];
+    Map<String, Course> courses = {};
+    for (int i = 0; i < data.length; i++) {
+      Course course = Course.fromJson(data[i]);
+
+      if (course.only.isEmpty || course.only.contains(group.name)) {
+        courses[course.title] = course;
+      }
     }
-    return null;
+
+    return courses;
   }
-}
 
-List<Course> courses = Subject.values.map((e) => Course(
-  subject: e,
-  teacher: Teacher(
-    anrede: 'Herr',
-    vorname: 'Alexander',
-    nachname: 'Tillner',
-    kuerzel: 'TillA',
-    faecher: 'Chemie, Geschichte',
-    email: 'alexander.tillner@lk.brandenburg.de',
-  ),
-  room: Room(
-    number: '1.69',
-    name: '1.69',
-    teacher: 'Herr Tillner',
-    image: '',
-    type: 'Gesellschaftswissenschaften',
-    startX: 0,
-    startY: 0,
-    endX: 0,
-    endY: 0,
-  ),
-)).toList();
+  Course.fromTitle(String title) {
+    Course? course;
+    for (Course c in courses.values) {
+      if (c.title == title) course = c;
+    }
+    this.title = course?.title ?? 'Unbekannter Kurs';
+    subject = course?.subject ?? Subject.error;
+    teacher = course?.teacher ?? Teacher.fromShort('');
+    times = course?.times ?? [[], []];
+  }
 
-void sortCourses() {
-  courses.sort((a, b) => a.subject.title.compareTo(b.subject.title));
+  Course.fromJson(var json) {
+    title = json['title'];
+    subject = Subject.fromShort(json['subject']);
+    teacher = Teacher.fromShort(json['teacher']);
+
+    List<List<String>> times = [];
+    for (var time in json['times']) {
+      times.add([time[0], time[1]]);
+    }
+    this.times = times;
+
+    only = json['only'] ?? [];
+    required = json['required'] ?? false;
+  }
 }
